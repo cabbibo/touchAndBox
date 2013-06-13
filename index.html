@@ -1,0 +1,337 @@
+<!--
+
+    Simple javascript example attempting to show off some of the new tools
+    added to leapjs:
+        
+      - interactionBox
+      - touchZone
+      - touchDist
+
+    The leap build you include in your file must be contain these new tools
+    for this to work. The leap.js that is part of this repository contains
+    these tools, but will be updated so that they way they are pulled in is 
+    prettier.
+
+    Please contact me: icohen [at] leapmotion [dot] com
+    with any comments or questions.
+
+-->
+
+<html>
+
+  <title>Touch Tools</title>
+
+
+  <head>
+
+    <script src = "three.min.js" ></script>
+    <script src = "leap.js" ></script>
+
+  </head>
+
+
+  <style>
+
+    #container{
+
+      position:absolute;
+      left:0px;
+      top:0px;
+
+    }
+
+  </style>
+
+  <body>
+
+    <div id="container"></div>
+
+  </body>
+
+
+  <script>
+
+    // Global Variables:
+
+    // THREE.js variables
+    var clock,camera,scene,renderer;
+
+    // LEAP.js variables
+    var frame,oFrame;
+
+    // Application Specific variables
+
+    // Size we will use to place objects and create reasonable sizes
+    var SCENESIZE = 500;
+
+    // This is the mesh that will show our interactionBox
+    var interactionBox;
+
+    // This is the array that will hold our tipObjects
+    var tips = [];
+
+    // Setting up a geometry we can use for all of the different tips
+    var tipGeometry = new THREE.SphereGeometry( SCENESIZE/20 , 20 , 20 );
+
+    /*
+      
+      Initialize application,
+      and begin animation
+
+    */
+    init();    
+    animate();
+
+
+    /*
+
+      INITIALIZATION FUNCTION
+
+    */
+
+    function init(){
+
+      // Setting up a clock to use with the stats
+      clock = new THREE.Clock();
+
+      // Sets up the Camera
+      camera = new THREE.PerspectiveCamera( 
+        75,                                     //FOV ( Top to Bottom ) Angle
+        window.innerWidth / window.innerHeight, //Aspect Ratio of Frustum
+        SCENESIZE/100,                          //Near plane
+        3 * SCENESIZE                           //Far Plane
+      );
+
+      // Sets our camera position at the 'edge' of the scene
+      camera.position.z = SCENESIZE;  
+      camera.position.y = SCENESIZE/2;  
+
+      // Creates the THREE.Scene, which is where all objects will be added.
+      scene = new THREE.Scene();
+
+      // Only allowing for 10 fingers. Sorry if you have more than that.
+      for( var i = 0; i < 10; i ++){
+
+        // Create a new TIP object
+        var tip = new TIP();
+
+        // Push this tip to the tips array
+        tips.push(tip);
+
+      }
+
+
+      // Creating the interaction box, which we will scale based on
+      // the size of the interaction box 
+      var boxGeo = new THREE.CubeGeometry( 1 , 1 , 1 );
+      var boxMaterial = new THREE.MeshBasicMaterial({ color:0x0000ff, wireframe:true});
+      
+      interactionBox = new THREE.Mesh( boxGeo , boxMaterial );
+     
+      scene.add(interactionBox);
+
+      // Creates the renderer
+      renderer = new THREE.WebGLRenderer();
+      renderer.setSize( window.innerWidth, window.innerHeight );
+      renderer.domElement.style.position = 'absolute';
+
+      // Gets the div that we will add the renderer to 
+      var container = document.getElementById( 'container' );
+
+      // and adds that renderer to that element
+      container.appendChild(renderer.domElement);
+      
+      /*
+      
+          Setting up the Leap Controller on frame function
+
+      */
+      controller = new Leap.Controller();
+
+      controller.on('frame',function(data){
+
+        // Set the global frame variable equal to the data 
+        // coming from the frame call
+        frame = data;
+
+        // If there is no oFrame, set it equal to frame
+        // This should only be true for the first frame
+        if(!oFrame){
+          oFrame = frame;
+        }
+
+        /*
+          
+          Updating the interaction Box
+
+        */
+
+        interactionBox.scale.x = 2 * frame.interactionBox.size.x;
+        interactionBox.scale.y = 2 * frame.interactionBox.size.y;
+        interactionBox.scale.z = 2 * frame.interactionBox.size.z;
+
+        interactionBox.position.x = frame.interactionBox.center.x;
+        interactionBox.position.y = frame.interactionBox.center.y;
+        interactionBox.position.z = frame.interactionBox.center.z;
+        
+
+        /*
+
+          Placing the tips
+
+        */
+
+        for( var i = 0 ; i < tips.length ; i++ ){
+
+          var tip = tips[i];
+
+          // If there is a pointable for this tip,
+          // do all the things we want to do
+          if( frame.pointables[i] ){
+
+            var pointable = frame.pointables[i];
+
+            tip.stabilized.position = pointable.stabilizedTipPosition;
+            tip.unstabilized.position = pointable.tipPosition;
+
+            // Set the touchZone equal to the current pointables touchZone
+            tip.touchZone = frame.pointables[i].touchZone;
+            tip.touchDist = frame.pointables[i].touchDist;
+
+            // Scaling the tip objects, so we can see 
+            // how close to the touch plane we are
+            tip.stabilized.scale.x = tip.touchDist + 1;            
+            tip.stabilized.scale.y = tip.touchDist + 1;            
+            tip.stabilized.scale.z = tip.touchDist + 1;            
+            
+            tip.unstabilized.scale.x = tip.touchDist + 1;          
+            tip.unstabilized.scale.y = tip.touchDist + 1;          
+            tip.unstabilized.scale.z = tip.touchDist + 1;          
+
+            // Setting the opacity of the tip materials
+            // To match the hover state 
+            if ( tip.touchZone == 'hovering' ){
+
+              tip.stabilizedMaterial.opacity = .1;
+              tip.unstabilizedMaterial.opacity = .1;
+
+            }else if( tip.touchZone == 'touching' ){
+
+              tip.stabilizedMaterial.opacity = 1;
+              tip.unstabilizedMaterial.opacity = 1;
+
+            } 
+
+          // Otherwise, move it far, far away
+          }else{
+
+            tip.stabilized.position.x = SCENESIZE * 100;
+            tip.unstabilized.position.x = SCENESIZE * 100 ; 
+
+          }
+          
+
+        }
+
+        // At the end of the loop, set the oFrame equal to this frame,
+        // so that we can use it in the next frame.
+        oFrame = frame;
+        
+      });
+
+      // Connects our controller, which gets the frames rolling
+      controller.connect();
+
+      // Adds a resize event so that when we change the size of browser,
+      // the renderer and camera get updated.
+      window.addEventListener( 'resize', onWindowResize, false );
+    
+    }
+
+    // Animates our scene, by using the requestAnimationFrame
+    // and rendering the scene on each animation frame
+    function animate(){
+
+      // Creates the loop
+      requestAnimationFrame(animate);
+
+      // Renders the scene
+      renderer.render(scene,camera);
+
+    }
+
+    // Resizes the camera and renderer
+    // so that they always fill the screen
+    function onWindowResize() {
+
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize( window.innerWidth, window.innerHeight );
+
+    }
+
+
+
+    /*
+
+        TIP Object
+
+    */
+    function TIP(){
+
+      // Creating a tip material, so we can alter its opacity
+      // independently from other tips
+      // Unstablized tips are RED
+      this.unstabilizedMaterial = new THREE.MeshBasicMaterial({color:0xff0000});
+      this.unstabilizedMaterial.transparent = true;
+      this.unstabilizedMaterial.opacity = 0.00001;
+
+   
+      // Creating the mesh
+      this.unstabilized = new THREE.Mesh( tipGeometry , this.unstabilizedMaterial );
+
+      // Moving the mesh far, far away so it will never be seen in the scene,  
+      // unless we move it in range
+      this.unstabilized.position.x = SCENESIZE * 100;
+
+      scene.add( this.unstabilized );
+
+
+      // Creating a stabilized tip material, so we can alter its opacity
+      // independently from other tips
+      // Stablized tips are GREEN
+      this.stabilizedMaterial = new THREE.MeshBasicMaterial({color:0x00ff00});
+      this.stabilizedMaterial.transparent = true;
+      this.stabilizedMaterial.opacity = 0.1;
+
+      // Creating the mesh
+      this.stabilized = new THREE.Mesh( tipGeometry , this.stabilizedMaterial );
+      
+      // Moving the mesh far, far away so it will never be seen in the scene,  
+      // unless we move it in range
+      this.stabilized.position.x = SCENESIZE * 100;
+
+      scene.add( this.stabilized );
+
+
+      // Adding a few extra variables, which can be accessed
+      // by leap's pointable object
+
+      // touchZone: 
+      // tells us if this specific pointable is touching or hovering
+      this.touchZone = 'hovering' ;
+
+      // touchDist:
+      // tells us how far away we are from the touchPlane
+      this.touchDist = 0 ; 
+
+
+    }
+
+
+  </script>
+
+
+</html>
+
