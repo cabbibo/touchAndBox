@@ -200,13 +200,14 @@
 
             // Scaling the tip objects, so we can see 
             // how close to the touch plane we are
-            tip.stabilized.scale.x = tip.touchDist + 1;            
-            tip.stabilized.scale.y = tip.touchDist + 1;            
-            tip.stabilized.scale.z = tip.touchDist + 1;            
+            var scale = Math.abs(tip.touchDist) + 1;
+            tip.stabilized.scale.x = scale; 
+            tip.stabilized.scale.y = scale;            
+            tip.stabilized.scale.z = scale;            
             
-            tip.unstabilized.scale.x = tip.touchDist + 1;          
-            tip.unstabilized.scale.y = tip.touchDist + 1;          
-            tip.unstabilized.scale.z = tip.touchDist + 1;          
+            tip.unstabilized.scale.x = scale;          
+            tip.unstabilized.scale.y = scale;          
+            tip.unstabilized.scale.z = scale;          
 
             // Setting the opacity of the tip materials
             // To match the hover state 
